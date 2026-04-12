@@ -1,0 +1,131 @@
+// ---PARAMETERS---
+
+//ray marching parameters
+const int MAX_MARCHING_STEPS = 255;
+const float MIN_DIST = 5.0;
+const float MAX_DIST = 150.0;
+const float PRECISION = 0.0001;
+
+//Shading parameters
+const float SHADOW_INTENSITY = .25;
+const vec3 LIGHT_COLOR = vec3(0.996,0.663,0.624);
+const float LIGHT_INTENSITY = 1.3;
+
+const vec3 COLOR_A = vec3(0.180,0.188,0.522);
+const vec3 COLOR_B = vec3(0.851,0.149,0.149);
+
+// ----------------
+
+// Rotation matrices
+mat3 rotX(float a) {
+    return mat3(1,      0,       0, 
+                0, cos(a), -sin(a), 
+                0, sin(a), cos(a));
+}
+mat3 rotY(float a) {
+    return mat3( cos(a), 0, sin(a), 
+                      0, 1,      0, 
+                -sin(a), 0, cos(a));
+}
+mat3 rotZ(float a) {
+    return mat3(cos(a), -sin(a), 0, 
+                sin(a),  cos(a), 0, 
+                     0,       0, 1);
+}
+
+//https://iquilezles.org/articles/distfunctions/
+float sdBox( vec3 p, vec3 b )
+{
+  vec3 q = abs(p) - b;
+  return length(max(q,0.0)) + min(max(q.x,max(q.y,q.z)),0.0);
+}
+
+float saturate(float f)
+{
+  return clamp(f, 0., 1.);
+}
+
+// -----------------------------------------------
+
+float scene(vec3 p) 
+{   
+    vec3 pos = vec3(sin(p.x)+.3*.5, p.y, fract(p.z)*1.8-2.);
+    pos *= rotZ(iTime*.3+p.z);
+    pos.y = length(pos.x)*1.5*(sin(iTime*.1)*.5+.5);
+    float box = sdBox(pos, vec3(1.05));
+    
+    float shape = 1.- box;
+    return shape;
+}
+
+vec3 calcNormal(vec3 p) 
+{
+    vec2 e = vec2(1.0, -1.0) * 0.0005; 
+    return normalize(
+    e.xyy * scene(p + e.xyy) +
+    e.yyx * scene(p + e.yyx) +
+    e.yxy * scene(p + e.yxy) +
+    e.xxx * scene(p + e.xxx));
+}
+
+float rayMarch (vec3 ro, vec3 rd, float start, float end) 
+{
+    float depth = start; // We start with a depth of zero and increment the depth gradually
+    float co; //closest object
+    
+    for (int i = 0; i < MAX_MARCHING_STEPS; i++) {
+        vec3 p = ro + depth * rd; // test point
+        co = scene(p); // pass the test point to the SdScene function
+        depth += co; // increment the depth gradually by the value of the distance returned by the sdSphere function
+        if (co < PRECISION || depth > end) break; //if the distance is within 0.001 units away from the sphere, we consider this close enough to the sphere. If the depth is greater than the end unit, we stop the loop
+    }
+    
+    co = depth;
+    
+    return co;
+}
+
+vec3 lambertShading(vec3 n, vec3 l, vec3 v, vec3 c)
+{
+  float NdotL = clamp(dot(n, l), 0., 1.);
+  vec3 shadowed = c * (1. - SHADOW_INTENSITY) * min(LIGHT_INTENSITY, 1.);
+  vec3 illuminated = c*LIGHT_COLOR*LIGHT_INTENSITY;
+  vec3 diff = mix(shadowed, illuminated, NdotL);
+  return diff;
+}
+
+void mainImage( out vec4 fragColor, in vec2 fragCoord )
+{
+    // Normalized pixel coordinates (from 0 to 1)
+    vec2 uv = (fragCoord - .5 * iResolution.xy) / iResolution.y;
+    
+    uv.x = length(uv*.5)*10.;
+    
+    
+    vec3 backgroundColor = vec3(0.941,0.686,0.659);
+    vec3 sceneColor = vec3(0.,0.,0.);
+    vec3 camera = vec3(uv.x, uv.y, -iTime*.5);
+    
+    vec3 ro = vec3(camera.xy, camera.z); // ray origin is the position of our camera, set 3 units behind the canvas
+    vec3 rd = normalize(vec3(uv, -1.)); // ray direction pointing toward our scene
+    float co = rayMarch(ro, rd, MIN_DIST, MAX_DIST); // distance from the ray marching algorithm
+    vec3 col = vec3(0.);
+    vec3 lightPosition = vec3(camera.x, camera.y+200., 2.);
+    if (co > MAX_DIST) {
+        col = backgroundColor; // ray didn't hit anything
+      } else {
+        vec3 p = ro + rd * co; // point on sphere we discovered from ray marching
+        vec3 normal = calcNormal(p);
+        vec3 lightColor = LIGHT_COLOR*LIGHT_INTENSITY;
+        vec3 lightDirection = normalize(lightPosition - p);
+        vec3 viewDir = normalize(ro - p);
+        
+        float depth = smoothstep( 0., .8, co/MAX_DIST);
+        vec3 objectColor = mix (COLOR_A, COLOR_B, depth);
+        sceneColor = mix(objectColor, backgroundColor, depth);
+        
+        col = lambertShading(normal, lightDirection, viewDir, sceneColor);       
+      }
+
+    fragColor = vec4(col,1.0);
+}
