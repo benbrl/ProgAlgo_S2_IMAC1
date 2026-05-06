@@ -39,3 +39,5 @@ foreach(SRC_MAIN_FILE ${SRC_MAIN_FILES})
     endif()
     
 endforeach()
+
+add_subdirectory("src/TD7")
