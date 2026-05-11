@@ -9,66 +9,120 @@
 #include <stack>
 #include <algorithm>
 
-using DataStructure::WeightedGraph;
 using DataStructure::IDType;
+using DataStructure::WeightedGraph;
 
-void DFS(WeightedGraph const& graph, IDType const start, std::function<void(IDType const)> const& callback, std::function<bool(IDType const)> const& should_explore_neighbors) {
-    std::set<IDType> visited {};
-    std::stack<IDType> to_visit {};
+void DFS(WeightedGraph const &graph, IDType const start, std::function<void(IDType const)> const &callback, std::function<bool(IDType const)> const &should_explore_neighbors)
+{
+    std::set<IDType> visited{};
+    std::stack<IDType> to_visit{};
     to_visit.push(start);
-    while (!to_visit.empty()) {
-        auto const current { to_visit.top() };
+    while (!to_visit.empty())
+    {
+        auto const current{to_visit.top()};
         to_visit.pop();
 
-        if (visited.contains(current)) {
+        if (visited.contains(current))
+        {
             continue;
         }
 
         visited.insert(current);
         callback(current);
 
-        if (should_explore_neighbors(current)) {
-            for (auto const& edge : graph.get_neighbors(current)) {
+        if (should_explore_neighbors(current))
+        {
+            for (auto const &edge : graph.get_neighbors(current))
+            {
                 to_visit.push(edge.to);
             }
         }
     }
 }
 
-void print_DFS(WeightedGraph const& graph, IDType const start) {
+void print_DFS(WeightedGraph const &graph, IDType const start)
+{
     /* TODO */
 }
 
-
-template<class T>
+template <class T>
 using min_priority_queue = std::priority_queue<T, std::vector<T>, std::greater<T>>;
 
 // map of node id to pair of cost and parent node id (for path reconstruction)
-std::unordered_map<IDType, std::pair<float, IDType>> Dijkstra(WeightedGraph const& graph, IDType const start, IDType const end) {
-    std::unordered_map<IDType, std::pair<float, IDType>> distances {};
+std::unordered_map<IDType, std::pair<float, IDType>> Dijkstra(WeightedGraph const &graph, IDType const start, IDType const end)
+{
+    std::unordered_map<IDType, std::pair<float, IDType>> distances{};
     // priority queue of pair of current cost from starting node and current node id
     // this will sort node base on the cost (as pair are ordered with lexicographical order)
-    min_priority_queue<std::pair<float, IDType>> to_visit {};
+    min_priority_queue<std::pair<float, IDType>> to_visit{};
 
     to_visit.push({0.0f, start});
 
-    /* TODO */
-    
+    // on hard code le point de depart a une distance de 0
+    distances[start] = {0.0f, start};
+
+    // distances
+
+
+    //     faire tant que tous les points n'ont pas été visités
+
+    while (!to_visit.empty())
+    {
+
+        auto current_lenght = to_visit.top().first;
+        auto current_node = to_visit.top().second;
+
+        to_visit.pop();
+
+        if (current_node == end)
+        {
+            break;
+        }
+
+        if (current_lenght > distances[current_node].first)
+        {
+            continue;
+        }
+
+        // prendre tous les voisins de notre node et calculer leurs couts (la longeur pour ce deplacer jusqu'a l'autre point)
+        for (auto const &edge : graph.get_neighbors(current_node))
+        {
+            float cout = current_lenght + edge.weight;
+
+            // debug
+            //  std::cout << cout << std::endl;
+
+            // si la nouvelle distance est plus courte on modifie
+            if (!distances.contains(edge.to) || cout < distances[edge.to].first)
+            {
+                distances[edge.to] = {cout, current_node};
+
+                to_visit.push({cout, edge.to});
+            }
+        }
+
+
+    }
+
     return distances;
 }
 
-std::vector<IDType> reconstruct_path(std::unordered_map<IDType, std::pair<float, IDType>> const& distances, IDType const start, IDType const end) {
-    std::vector<IDType> path { };
-    IDType current_node { end };
-    while (current_node != start) {
+std::vector<IDType> reconstruct_path(std::unordered_map<IDType, std::pair<float, IDType>> const &distances, IDType const start, IDType const end)
+{
+    std::vector<IDType> path{};
+    IDType current_node{end};
+    while (current_node != start)
+    {
         path.push_back(current_node);
 
-        auto const find_current_node { distances.find(current_node) };
-        if(find_current_node == distances.end()) {
+        auto const find_current_node{distances.find(current_node)};
+        if (find_current_node == distances.end())
+        {
             // if we reach a node that is not in the distances map, it means that there is no path from start to end
             return {};
         }
-        else {
+        else
+        {
             // we update the current node to its parent node
             current_node = find_current_node->second.second;
         }
@@ -78,6 +132,7 @@ std::vector<IDType> reconstruct_path(std::unordered_map<IDType, std::pair<float,
     return path;
 }
 
-std::vector<IDType> dijkstra_path(WeightedGraph const& graph, IDType const start, IDType const end) {
+std::vector<IDType> dijkstra_path(WeightedGraph const &graph, IDType const start, IDType const end)
+{
     return reconstruct_path(Dijkstra(graph, start, end), start, end);
 }
